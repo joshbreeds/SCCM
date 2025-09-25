@@ -1,48 +1,36 @@
 Option Explicit
 
-Dim objShell, objFSO, strCCMSetup, strArgs, intReturn, strLogTime
+Dim objShell, objFSO, strInstall, strArgs, intReturn, strLogTime
 Set objShell = CreateObject("WScript.Shell")
 Set objFSO   = CreateObject("Scripting.FileSystemObject")
 
 ' --- Config: update these values ---
 Const MP       = "SCCMSERVER.domain.local"
 Const SITECODE = "ABC"
+Const ISO_DRIVE = "Z:\"
+Const LOCAL_INSTALLER = ISO_DRIVE & "install.bat"   ' your fixed batch file on the ISO
 
-' --- Local ccmsetup path ---
-strCCMSetup = objShell.ExpandEnvironmentStrings("%windir%") & "\ccmsetup\ccmsetup.exe"
-
-' --- Helper function for timestamped logging ---
+' --- Helper for logging ---
 Function Log(msg)
     strLogTime = Now
     WScript.Echo "[" & strLogTime & "] " & msg
 End Function
 
-Log "Starting SCCM client reinstall..."
+Log "Starting SCCM client reinstall from mounted ISO..."
 
-' --- Uninstall if ccmsetup exists ---
-If objFSO.FileExists(strCCMSetup) Then
-    Log "Uninstalling SCCM client..."
-    objShell.Run """" & strCCMSetup & """ /uninstall", 0, True
-    Log "Waiting 60 seconds for uninstall to complete..."
-    WScript.Sleep 60000
-Else
-    Log "No existing ccmsetup.exe found, skipping uninstall."
-End If
-
-' --- Reinstall from local ccmsetup.exe ---
-If objFSO.FileExists(strCCMSetup) Then
-    strArgs = "/mp:" & MP & " SMSSITECODE=" & SITECODE & " /logon"
-    Log "Installing SCCM client from local source..."
-    intReturn = objShell.Run("""" & strCCMSetup & """ " & strArgs, 0, True)
+' --- Check that install.bat exists on the ISO ---
+If objFSO.FileExists(LOCAL_INSTALLER) Then
+    Log "Running install.bat from " & LOCAL_INSTALLER
+    intReturn = objShell.Run("""" & LOCAL_INSTALLER & """", 0, True)
 
     If intReturn = 0 Then
-        Log "SCCM client reinstall initiated successfully."
+        Log "SCCM client install initiated successfully."
     Else
-        Log "SCCM client reinstall failed with exit code " & intReturn
+        Log "SCCM client install failed with exit code " & intReturn
         WScript.Quit intReturn
     End If
 Else
-    Log "ERROR: Local ccmsetup.exe not found."
+    Log "ERROR: install.bat not found on " & LOCAL_INSTALLER
     WScript.Quit 1
 End If
 
