@@ -1,14 +1,13 @@
 Option Explicit
 
-Dim objShell, objFSO, strInstall, strArgs, intReturn, strLogTime
+Dim objShell, objFSO, strRemove, strInstall, intReturn, strLogTime
 Set objShell = CreateObject("WScript.Shell")
 Set objFSO   = CreateObject("Scripting.FileSystemObject")
 
-' --- Config: update these values ---
-Const MP       = "SCCMSERVER.domain.local"
-Const SITECODE = "ABC"
+' --- Config ---
 Const ISO_DRIVE = "Z:\"
-Const LOCAL_INSTALLER = ISO_DRIVE & "install.bat"   ' your fixed batch file on the ISO
+Const REMOVE_BAT  = ISO_DRIVE & "remove.bat"
+Const INSTALL_BAT = ISO_DRIVE & "install.bat"
 
 ' --- Helper for logging ---
 Function Log(msg)
@@ -16,21 +15,33 @@ Function Log(msg)
     WScript.Echo "[" & strLogTime & "] " & msg
 End Function
 
-Log "Starting SCCM client reinstall from mounted ISO..."
+Log "Starting SCCM client uninstall + reinstall from mounted ISO..."
 
-' --- Check that install.bat exists on the ISO ---
-If objFSO.FileExists(LOCAL_INSTALLER) Then
-    Log "Running install.bat from " & LOCAL_INSTALLER
-    intReturn = objShell.Run("""" & LOCAL_INSTALLER & """", 0, True)
+' --- Run remove.bat ---
+If objFSO.FileExists(REMOVE_BAT) Then
+    Log "Running remove.bat..."
+    intReturn = objShell.Run("""" & REMOVE_BAT & """", 0, True)
+    If intReturn <> 0 Then
+        Log "Warning: remove.bat returned exit code " & intReturn
+    End If
+    Log "Waiting 60 seconds for uninstall to complete..."
+    WScript.Sleep 60000
+Else
+    Log "ERROR: remove.bat not found on " & REMOVE_BAT
+End If
 
+' --- Run install.bat ---
+If objFSO.FileExists(INSTALL_BAT) Then
+    Log "Running install.bat..."
+    intReturn = objShell.Run("""" & INSTALL_BAT & """", 0, True)
     If intReturn = 0 Then
-        Log "SCCM client install initiated successfully."
+        Log "SCCM client reinstall initiated successfully."
     Else
-        Log "SCCM client install failed with exit code " & intReturn
+        Log "ERROR: install.bat returned exit code " & intReturn
         WScript.Quit intReturn
     End If
 Else
-    Log "ERROR: install.bat not found on " & LOCAL_INSTALLER
+    Log "ERROR: install.bat not found on " & INSTALL_BAT
     WScript.Quit 1
 End If
 
