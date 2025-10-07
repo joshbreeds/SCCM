@@ -1,0 +1,68 @@
+#NAME: New-CMApplication.ps1#
+#AUTHOR: Joshua Breeds - 07/10/2025#
+#SYNOPSIS: Creates new device collections for a new CM Application.#
+#DESCRIPTION: 
+#LAST EDIT: 07/10/2025#
+
+# Welcome message
+Write-Host "Welcome to the New-CMApplication script!" -ForegroundColor Cyan
+Start-Sleep -Seconds 2
+
+# Import Configuration Manager module and Set-Location to the site drive.
+$CMModulePath = Join-Path -Path (Split-Path -Path "${Env:SMS_ADMIN_UI_PATH}" -ErrorAction Stop) -ChildPath "ConfigurationManager.psd1"
+Import-Module $CMModulePath -ErrorAction Stop
+$SiteCode = Read-Host "Enter your Configuration Manager Site Code (e.g., MS1)"
+Set-Location $SiteCode':'
+Write-Host "CM Site set to MS1." -ForegroundColor Green
+Start-Sleep -Seconds 4
+
+# Get name of new application
+$ApplicationName = Read-Host "What is the name of your new application? E.g Wireshark/Google Chrome etc (Enter name as you want it displayed, it will be used throughout SCCM)"
+
+## Create new folders - for application and device collections ##
+
+# Device Collections Folder
+Write-Host "Creating new folder for $ApplicationName Device Collections in Assets and Compliance..." -ForegroundColor Green
+Start-Sleep -Seconds 2
+$AssetsParentPath = "\DeviceCollection\Application Management Only - Do not use for anything else"
+New-CMFolder -ParentFolderPath $AssetsParentPath -Name $ApplicationName
+Write-Host "Created $ApplicationName in Assets and Compliance." -ForegreoundColor Green
+# Applications Folder
+Write-Host "Creating new folder for $ApplicationName in Software Library..." -ForegroundColor Green
+Start-Sleep -Seconds 2
+$ApplicationParentPath = "\Application"
+New-CMFolder -ParentFolderPath $ApplicationParentPath -Name $ApplicationName
+Write-Host "Created $ApplicationName folder in Software Library." -ForegroundColor Green
+Write-Host "You may need to refresh the console." -ForegroundColor Yellow
+
+## Create device collections for new application ##
+Write-Host "Creating new device collections for managing $ApplicationName..."
+Set-Location "\DeviceCollection\Application Management Only - Do not use for anything else\$ApplicationName"
+Start-Sleep -Seconds 3
+
+# All Servers prevented from having $ApplicationName installed
+New-CMDeviceCollection -Name "All Servers prevented from having $ApplicationName installed" -LimitingCollectionName "All Desktop and Server Clients" -Comment "This is a standard Application management collection, used to prevent installation."
+# All Servers that may have $ApplicationName installed
+New-CMDeviceCollection -Name "All Servers that may have $ApplicationName installed" -LimitingCollectionName "All Desktop and Server Clients" -Comment "This is a standard Application management collection, used to allow installation to be available in Software Center."
+# All Servers that must have $ApplicationName installed
+New-CMDeviceCollection -Name "All Servers that must have $ApplicationName installed" -LimitingCollectionName "All Desktop and Server Clients" -Comment "This is a standard Application management collection, used to force installation."
+# All Servers with a DP approved version of $ApplicationName installed
+New-CMDeviceCollection -Name "All Servers with a DP approved version of $ApplicationName installed" -LimitingCollectionName "All Desktop and Server Clients" -Comment "This shows any machines that have a supported and managed version of $ApplicationName"
+$DPApprovedVersion = Read-Host "What is the DP Approved Version of this application?"
+$DPApprovedCollectionWQL = select distinct SMS_R_System.ResourceId, SMS_R_System.ResourceType, SMS_R_System.Name, SMS_R_System.SMSUniqueIdentifier, SMS_R_System.ResourceDomainORWorkgroup, SMS_R_System.Client from  SMS_R_System inner join SMS_G_System_ADD_REMOVE_PROGRAMS_64 on SMS_G_System_ADD_REMOVE_PROGRAMS_64.ResourceID = SMS_R_System.ResourceId where SMS_G_System_ADD_REMOVE_PROGRAMS_64.DisplayName like "%$ApplicationName%" and SMS_G_System_ADD_REMOVE_PROGRAMS_64.Version = "$DPApprovedVersion"
+Add-CMDeviceCollectionQueryMembershipRule -CollectionName "All Servers with a DP approved version of $ApplicationName installed" -QueryExpression $DPApprovedCollectionWQL -RuleName "All Servers with DP approved version of $ApplicatonName installed."
+# All Servers with unapproved version of $ApplicationName installed
+New-CMDeviceCollection -Name "All Servers with unapproved version of $ApplicationName installed" -LimitingCollectionName "All Desktop and Server Clients" -Comment "This shows any machines that do not have latest version of supported $ApplicationName and must be updated."
+$DPUnapprovedCollectionWQL = select distinct SMS_R_System.ResourceId, SMS_R_System.ResourceType, SMS_R_System.Name, SMS_R_System.SMSUniqueIdentifier, SMS_R_System.ResourceDomainORWorkgroup, SMS_R_System.Client from  SMS_R_System inner join SMS_G_System_ADD_REMOVE_PROGRAMS_64 on SMS_G_System_ADD_REMOVE_PROGRAMS_64.ResourceID = SMS_R_System.ResourceId where SMS_G_System_ADD_REMOVE_PROGRAMS_64.DisplayName like "%$ApplicationName%" and SMS_G_System_ADD_REMOVE_PROGRAMS_64.Version != "$DPApprovedVersion"
+Add-CMDeviceCollectionQueryMembershipRule -CollectionName "All Servers with an unapproved version of $ApplicationName installed" -QueryExpression $DPUnapprovedCollectionWQL -RuleName "All Servers with unapproved version of $ApplicatonName installed."
+# All Servers that must have a test version of $ApplicationName installed
+New-CMDeviceCollection -Name "All Servers that must have a test version of $ApplicationName installed" -LimitingCollectionName "All Desktop and Server Clients" -Comment "This collection is used for testing new versions of $ApplicationName."
+
+# Final messages
+Write-Host "All device collections created." -ForegroundColor Green
+Write-Host "Don't forget you may need to refresh/restart the SCCM Console" -ForegroundColor Yellow
+Write-Host "Goodbye!" -ForegroundColor Cyan
+
+
+
+
