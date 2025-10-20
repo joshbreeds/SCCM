@@ -1,0 +1,11 @@
+SELECT 
+    SYS.Netbios_Name0 AS [Server Name],
+    ARP.DisplayName0 AS [Application Name],
+    ARP.Version0 AS [Version],
+    ARP.Publisher0 AS [Publisher]
+FROM v_R_System AS SYS
+INNER JOIN v_Add_Remove_Programs AS ARP
+    ON SYS.ResourceID = ARP.ResourceID
+WHERE SYS.Operating_System_Name_and0 LIKE '%Server%'
+  AND ARP.DisplayName0 LIKE '%' + @AppName + '%'
+ORDER BY SYS.Netbios_Name0, ARP.DisplayName0;
